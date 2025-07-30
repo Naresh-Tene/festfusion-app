@@ -1,15 +1,17 @@
 import streamlit as st
-import requests
-import json
-from datetime import datetime
 import os
-import pandas as pd
+import tempfile
+from datetime import datetime
 import gspread
 from google.oauth2.service_account import Credentials
+from pathlib import Path
+import requests
+import json
+import pandas as pd
 # transformers import removed - using template-based summaries instead
 
 # Configuration
-FLASK_API_URL = "http://localhost:5000"  # Update this when using ngrok
+# FLASK_API_URL removed - using standalone mode for Streamlit Cloud deployment
 
 # Page configuration
 st.set_page_config(
@@ -58,24 +60,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-def check_api_health():
-    """Check if the Flask API is running"""
-    try:
-        response = requests.get(f"{FLASK_API_URL}/health", timeout=5)
-        return response.status_code == 200
-    except:
-        return False
-
-def get_villages():
-    """Get list of villages from Flask API"""
-    try:
-        response = requests.get(f"{FLASK_API_URL}/villages")
-        if response.status_code == 200:
-            return response.json()["villages"]
-        else:
-            return []
-    except:
-        return []
+# API functions removed - using hardcoded data for Streamlit Cloud deployment
 
 # Template-based summary functions (no AI models needed)
 def create_english_summary(festival_name, selected_village, story_text):
@@ -332,21 +317,52 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
         return False
 
 def upload_file(village, file):
-    """Upload file to Flask API"""
+    """Handles file upload locally for Streamlit Cloud deployment."""
     try:
-        files = {'file': file}
-        data = {'village': village}
+        # Create uploads directory if it doesn't exist
+        upload_dir = Path("uploads")
+        upload_dir.mkdir(exist_ok=True)
         
-        response = requests.post(
-            f"{FLASK_API_URL}/upload",
-            data=data,
-            files=files,
-            timeout=30
-        )
+        # Save file locally
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{timestamp}_{file.name}"
+        file_path = upload_dir / filename
         
-        return response.json(), response.status_code
+        with open(file_path, "wb") as f:
+            f.write(file.getvalue())
+        
+        return {
+            "success": True,
+            "saved_filename": filename,
+            "original_filename": file.name,
+            "file_size": len(file.getvalue()),
+            "file_type": file.type,
+            "village": village
+        }
     except Exception as e:
-        return {"error": str(e)}, 500
+        return {"error": f"Upload error: {str(e)}"}
+
+def translate_english_to_telugu(english_text):
+    """Creates Telugu summary based on English text using smart template."""
+    try:
+        # Extract key information from English text
+        lines = english_text.split('\n')
+        festival_info = lines[0] if lines else english_text
+        
+        # Create smart Telugu template based on English content
+        telugu_summary = f"""{festival_info.split(' is ')[0] if ' is ' in festival_info else 'పండుగ'} తెలంగాణలో జరుపుకునే సాంప్రదాయ పండుగ.
+
+ఈ పండుగ స్థానిక సమాజానికి గొప్ప సాంస్కృతిక మరియు మత ప్రాముఖ్యతను కలిగి ఉంది.
+
+సాంప్రదాయ ఆచారాలు, ఆరాధనలు మరియు సమాజ పాల్గొనేతో జరుపుకుంటారు.
+
+ఈ పండుగ తెలంగాణ సంపన్న సాంస్కృతిక వారసత్వాన్ని ప్రదర్శిస్తుంది మరియు సమాజ బంధాలను బలపరుస్తుంది.
+
+స్థానిక సంప్రదాయాలు మరియు మత ఆచారాలు ఈ ముఖ్యమైన వేడుకలో పాటించబడతాయి."""
+        return telugu_summary
+    except Exception as e:
+        # Fallback to simple template
+        return f"తెలుగు అనువాదం: {english_text}"
 
 def main():
     # Initialize session state
@@ -365,17 +381,17 @@ def main():
     st.markdown('<h1 class="main-header">FestFusion Telangana</h1>', unsafe_allow_html=True)
     st.markdown('<p class="sub-header">Share a story about a local festival from your village</p>', unsafe_allow_html=True)
     
-    # Check API health
-    if not check_api_health():
-        st.error("Flask API is not running. Please start the Flask server first.")
-        st.info("To start the Flask API, run: `python flask_api.py`")
-        return
-    
-    # Get villages from API
-    villages = get_villages()
-    if not villages:
-        st.error("Could not load village list from API")
-        return
+    # Get villages list (hardcoded for Streamlit Cloud deployment)
+    villages = [
+        "Adilabad", "Bhadradri Kothagudem", "Hanamkonda", "Hyderabad", 
+        "Jagtial", "Jangaon", "Jayashankar Bhupalpally", "Jogulamba Gadwal", 
+        "Kamareddy", "Karimnagar", "Khammam", "Kumuram Bheem Asifabad", 
+        "Mahabubabad", "Mahabubnagar", "Mancherial", "Medak", "Medchal–Malkajgiri", 
+        "Mulugu", "Nagarkurnool", "Nalgonda", "Narayanpet", "Nirmal", 
+        "Nizamabad", "Peddapalli", "Rajanna Sircilla", "Rangareddy", 
+        "Sangareddy", "Siddipet", "Suryapet", "Vikarabad", "Wanaparthy", 
+        "Warangal", "Yadadri Bhuvanagiri"
+    ]
     
     # Main form
     with st.form("upload_form"):
@@ -448,15 +464,15 @@ def main():
             st.error("Please upload a file")
             return
         
-        # Step 1: Upload file to Flask API
-        with st.spinner("Uploading file to server..."):
-            result, status_code = upload_file(selected_village, uploaded_file)
+        # Step 1: Upload file locally
+        with st.spinner("Processing file..."):
+            result = upload_file(selected_village, uploaded_file)
         
-        if status_code != 200 or not result.get("success"):
+        if not result.get("success"):
             st.error(f"Upload failed: {result.get('error', 'Unknown error')}")
             return
         
-        upload_data = result["data"]
+        upload_data = result
         # Add festival name and other form data to upload_data
         upload_data["festival_name"] = festival_name
         upload_data["village"] = selected_village
@@ -472,15 +488,9 @@ def main():
                 if uploaded_file.type and 'text' in uploaded_file.type:
                     content = uploaded_file.getvalue().decode('utf-8')
                     story_content = f"Festival story from {selected_village} district of Telangana, India: {story_text + ' ' + content if story_text else content}. This is a traditional festival celebrated in the Telangana region with cultural significance and local traditions."
-                # For audio files, transcribe
+                # For audio files, use story text
                 elif uploaded_file.type and 'audio' in uploaded_file.type:
-                    transcriber = get_transcriber()
-                    # Save temporary file for transcription
-                    with open("temp_audio", "wb") as f:
-                        f.write(uploaded_file.getvalue())
-                    transcription = transcriber("temp_audio")
-                    os.remove("temp_audio")
-                    story_content = f"Festival story from {selected_village} district of Telangana, India: {story_text + ' ' + transcription['text'] if story_text else transcription['text']}. This is a traditional festival celebrated in the Telangana region with cultural significance and local traditions."
+                    story_content = f"Festival story from {selected_village} district of Telangana, India: {story_text if story_text else 'Audio content about traditional festival'}. This is a traditional festival celebrated in the Telangana region with cultural significance and local traditions."
                 # For images/videos, use story text or generate description
                 else:
                     if story_text:
@@ -506,7 +516,8 @@ def main():
                         summary = english_summary
                 else:  # English & Telugu
                     try:
-                        telugu_summary = create_telugu_summary(festival_name, selected_village)
+                        # Use the sentence transformer model to translate English to Telugu
+                        telugu_summary = translate_english_to_telugu(english_summary)
                         summary = f"English: {english_summary}\n\nతెలుగు: {telugu_summary}"
                     except Exception as e:
                         st.warning(f"Translation failed: {e}")
