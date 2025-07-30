@@ -15,7 +15,9 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'mp3', 'wav', 'mp4', 'txt', 'pdf'}
 MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
 
 # Google Services Configuration
-GOOGLE_CREDENTIALS_FILE = "festfusion-project-cc628988dd80.json"
+import os
+BASE_DIR = Path(__file__).parent
+GOOGLE_CREDENTIALS_FILE = BASE_DIR / "festfusion-project-cc628988dd80.json"
 GOOGLE_DRIVE_FOLDER_ID = "1DBeE3IW9h3i4m67OXS7nZ2iVO0zXXk0Q"  # FestFusion Uploads folder
 GOOGLE_SHEET_NAME = "FestFusion Data"  # Google Sheet name
 

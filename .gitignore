@@ -76,6 +76,9 @@ service_account.json
 google_credentials.json
 *.json
 
+# Streamlit secrets (local development)
+.streamlit/secrets.toml
+
 # Test files (optional - remove if you want to include them)
 test_*.py
 *_test.py

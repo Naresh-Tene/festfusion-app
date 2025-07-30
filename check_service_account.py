@@ -10,8 +10,11 @@ import gspread
 def check_service_account():
     """Check service account information"""
     try:
-        # Load credentials
-        with open("festfusion-project-cc628988dd80.json", "r") as f:
+        # Load credentials using absolute path
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        credentials_path = os.path.join(current_dir, "festfusion-project-cc628988dd80.json")
+        with open(credentials_path, "r") as f:
             creds_data = json.load(f)
         
         print("🔍 Service Account Information:")
@@ -27,7 +30,7 @@ def check_service_account():
             'https://www.googleapis.com/auth/drive'
         ]
         
-        creds = Credentials.from_service_account_file("festfusion-project-cc628988dd80.json", scopes=scope)
+        creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
         print(f"\n✅ Credentials loaded successfully")
         print(f"Scopes: {creds.scopes}")
         
@@ -45,7 +48,12 @@ def test_google_sheets_access(client_email):
             'https://www.googleapis.com/auth/drive'
         ]
         
-        creds = Credentials.from_service_account_file("festfusion-project-cc628988dd80.json", scopes=scope)
+        # Get credentials path
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        credentials_path = os.path.join(current_dir, "festfusion-project-cc628988dd80.json")
+        
+        creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
         client = gspread.authorize(creds)
         
         print(f"\n🔍 Testing Google Sheets Access:")

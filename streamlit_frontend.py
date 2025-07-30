@@ -213,19 +213,42 @@ TELUGU_TRANSLATIONS = {
 # Google Services Connection
 @st.cache_resource
 def get_creds():
-    """Gets the credentials to connect to Google services."""
+    """Gets the credentials to connect to Google services using Streamlit secrets."""
     scope = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
-    creds = Credentials.from_service_account_file("festfusion-project-cc628988dd80.json", scopes=scope)
-    return creds
+    
+    # Use Streamlit secrets for Streamlit Cloud deployment
+    try:
+        creds = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=scope
+        )
+        return creds
+    except Exception as e:
+        # Fallback to local file for development
+        try:
+            # Use absolute path to ensure the file is found regardless of working directory
+            import os
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            credentials_path = os.path.join(current_dir, "festfusion-project-cc628988dd80.json")
+            creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
+            return creds
+        except Exception as e2:
+            st.error(f"Failed to load Google credentials: {e2}")
+            return None
 
 def save_to_sheets(village, original_filename, saved_filename, file_type, english_summary, telugu_summary, story_text="", language="", festival_name=""):
     """Save data to Google Sheets using user-edited summaries"""
     try:
         print(f"Debug - Starting save_to_sheets function")
         creds = get_creds()
+        
+        if creds is None:
+            st.error("Google credentials not available. Please check your Streamlit secrets configuration.")
+            return False
+            
         client = gspread.authorize(creds)
         
         print(f"Debug - Connected to Google Sheets")
@@ -647,7 +670,7 @@ def main():
                 st.success("Successfully saved to Google Sheets!")
                 st.markdown("### Database Status")
                 st.write(f"**Saved to Sheets:** Success")
-                st.write(f"**Timestamp:** {upload_data['timestamp']}")
+                st.write(f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 
                 # Add a button to start new submission instead of auto-resetting
                 st.markdown("---")
@@ -751,7 +774,7 @@ def main():
                 st.success("Successfully saved to Google Sheets!")
                 st.markdown("### Database Status")
                 st.write(f"**Saved to Sheets:** Success")
-                st.write(f"**Timestamp:** {upload_data['timestamp']}")
+                st.write(f"**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 
                 # Add a button to start new submission instead of auto-resetting
                 st.markdown("---")
