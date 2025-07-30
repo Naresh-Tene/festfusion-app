@@ -6,7 +6,7 @@ import os
 import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
-from transformers import pipeline
+# transformers import removed - using template-based summaries instead
 
 # Configuration
 FLASK_API_URL = "http://localhost:5000"  # Update this when using ngrok
@@ -77,16 +77,30 @@ def get_villages():
     except:
         return []
 
-# AI Model Caching
-@st.cache_resource
-def get_summarizer():
-    """Loads the summarization model from Hugging Face."""
-    return pipeline("summarization", model="ai4bharat/indicbart")
+# Template-based summary functions (no AI models needed)
+def create_english_summary(festival_name, selected_village, story_text):
+    """Creates a clean 5-line English summary using templates"""
+    return f"""{festival_name} is a traditional festival celebrated in {selected_village} district of Telangana, India.
 
-@st.cache_resource
-def get_transcriber():
-    """Loads the audio transcription model (Whisper)."""
-    return pipeline("automatic-speech-recognition", model="openai/whisper-base")
+This festival holds great cultural and religious significance for the local community.
+
+Traditional rituals, prayers, and community participation mark the celebrations.
+
+This festival showcases Telangana's rich cultural heritage and strengthens community bonds.
+
+Local traditions and religious practices are observed during this important celebration."""
+
+def create_telugu_summary(festival_name, selected_village):
+    """Creates a clean 5-line Telugu summary using templates"""
+    return f"""{festival_name} తెలంగాణలో {selected_village} జిల్లాలో జరుపుకునే సాంప్రదాయ పండుగ.
+
+ఈ పండుగ స్థానిక సమాజానికి గొప్ప సాంస్కృతిక మరియు మత ప్రాముఖ్యతను కలిగి ఉంది.
+
+సాంప్రదాయ ఆచారాలు, ఆరాధనలు మరియు సమాజ పాల్గొనేతో జరుపుకుంటారు.
+
+ఈ పండుగ తెలంగాణ సంపన్న సాంస్కృతిక వారసత్వాన్ని ప్రదర్శిస్తుంది మరియు సమాజ బంధాలను బలపరుస్తుంది.
+
+స్థానిక సంప్రదాయాలు మరియు మత ఆచారాలు ఈ ముఖ్యమైన వేడుకలో పాటించబడతాయి."""
 
 # Comprehensive Telugu translation dictionary for festival terms
 TELUGU_TRANSLATIONS = {
@@ -209,19 +223,7 @@ TELUGU_TRANSLATIONS = {
     "christmas": "క్రిస్మస్"
 }
 
-@st.cache_resource
-def get_translator():
-    """Loads the translation model from Hugging Face."""
-    return pipeline("translation", model="ai4bharat/indictrans2-en-te")
-
-def translate_to_telugu(text):
-    """Improved translation to Telugu using AI4Bharat model"""
-    try:
-        translator = get_translator()
-        result = translator(text)
-        return result[0]['translation_text']
-    except Exception as e:
-        return f"తెలుగు అనువాదం: {text}"
+# Translation function removed - using template-based Telugu summaries instead
 
 # Google Services Connection
 @st.cache_resource
@@ -486,19 +488,9 @@ def main():
                     else:
                         story_content = f"Festival content from {selected_village} district of Telangana, India. This region is known for its rich cultural heritage and traditional festivals that celebrate local customs and religious practices."
                 
-                # Generate a simple, clean summary (about 5 lines)
+                # Generate summary using template functions
                 try:
-                    # Create a very simple, structured summary
-                    english_summary = f"""{festival_name} is a traditional festival celebrated in {selected_village} district of Telangana, India.
-
-This festival holds great cultural and religious significance for the local community.
-
-It is celebrated with traditional customs, rituals, and community participation.
-
-The festival showcases the rich cultural heritage of Telangana and strengthens community bonds.
-
-Local traditions and religious practices are observed during this important celebration."""
-                    
+                    english_summary = create_english_summary(festival_name, selected_village, story_text)
                 except Exception as e:
                     # Fallback to a simple summary
                     english_summary = f"{festival_name} is a traditional festival celebrated in {selected_village} district of Telangana, India. This festival holds cultural and religious significance for the local community."
@@ -508,32 +500,13 @@ Local traditions and religious practices are observed during this important cele
                     summary = english_summary
                 elif summary_language == "Telugu Only":
                     try:
-                        # Create a simple, clean Telugu summary (about 5 lines)
-                        summary = f"""{festival_name} తెలంగాణలో {selected_village} జిల్లాలో జరుపుకునే సాంప్రదాయ పండుగ.
-
-ఈ పండుగ స్థానిక సమాజానికి గొప్ప సాంస్కృతిక మరియు మత ప్రాముఖ్యతను కలిగి ఉంది.
-
-సాంప్రదాయ ఆచారాలు, ఆరాధనలు మరియు సమాజ పాల్గొనేతో జరుపుకుంటారు.
-
-ఈ పండుగ తెలంగాణ సంపన్న సాంస్కృతిక వారసత్వాన్ని ప్రదర్శిస్తుంది మరియు సమాజ బంధాలను బలపరుస్తుంది.
-
-స్థానిక సంప్రదాయాలు మరియు మత ఆచారాలు ఈ ముఖ్యమైన వేడుకలో పాటించబడతాయి."""
+                        summary = create_telugu_summary(festival_name, selected_village)
                     except Exception as e:
                         st.warning(f"Translation failed: {e}")
                         summary = english_summary
                 else:  # English & Telugu
                     try:
-                        # Create a simple, clean Telugu summary (about 5 lines)
-                        telugu_summary = f"""{festival_name} తెలంగాణలో {selected_village} జిల్లాలో జరుపుకునే సాంప్రదాయ పండుగ.
-
-ఈ పండుగ స్థానిక సమాజానికి గొప్ప సాంస్కృతిక మరియు మత ప్రాముఖ్యతను కలిగి ఉంది.
-
-సాంప్రదాయ ఆచారాలు, ఆరాధనలు మరియు సమాజ పాల్గొనేతో జరుపుకుంటారు.
-
-ఈ పండుగ తెలంగాణ సంపన్న సాంస్కృతిక వారసత్వాన్ని ప్రదర్శిస్తుంది మరియు సమాజ బంధాలను బలపరుస్తుంది.
-
-స్థానిక సంప్రదాయాలు మరియు మత ఆచారాలు ఈ ముఖ్యమైన వేడుకలో పాటించబడతాయి."""
-                        
+                        telugu_summary = create_telugu_summary(festival_name, selected_village)
                         summary = f"English: {english_summary}\n\nతెలుగు: {telugu_summary}"
                     except Exception as e:
                         st.warning(f"Translation failed: {e}")
