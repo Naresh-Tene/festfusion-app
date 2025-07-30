@@ -1,29 +1,29 @@
-# 🏛️ FestFusion Telangana
+#  FestFusion Telangana
 
 An AI-powered platform that preserves and celebrates the rich cultural heritage of Telangana's festivals through story collection, AI summarization, and digital archiving.
 
-## 🚀 Features
+## Features
 
-- **📝 Story Submission**: Users can submit festival stories with text and multimedia files
-- **🎵 Audio Transcription**: Automatic transcription of audio recordings using Whisper AI
-- **🤖 AI Summarization**: Intelligent summarization of stories using Hugging Face models
-- **📁 File Archiving**: Secure storage of uploaded files in Google Drive
-- **📊 Data Organization**: Structured data storage in Google Sheets by village/district
-- **🌐 Modern UI**: Beautiful Streamlit frontend with responsive design
-- **🔌 RESTful API**: Flask backend for scalable architecture
+- ** Story Submission**: Users can submit festival stories with text and multimedia files
+- **Audio Transcription**: Automatic transcription of audio recordings using Whisper AI
+- ** AI Summarization**: Intelligent summarization of stories using Hugging Face models
+- ** File Archiving**: Secure storage of uploaded files in Google Drive
+- **Data Organization**: Structured data storage in Google Sheets by village/district
+- ** Modern UI**: Beautiful Streamlit frontend with responsive design
+- ** RESTful API**: Flask backend for scalable architecture
 
-## 📋 Project Roadmap
+##  Project Roadmap
 
 | Step | Description | Status |
 |------|-------------|--------|
-| 1️⃣ | Set up Flask API to receive uploads on your PC | ✅ **Complete** |
-| 2️⃣ | Use Ngrok to expose your local Flask endpoint | 🔄 **Next** |
-| 3️⃣ | Build a Streamlit frontend for user uploads + village selection | ✅ **Complete** |
-| 4️⃣ | Once uploaded, run AI model (Hugging Face) to summarize content | ✅ **Complete** |
-| 5️⃣ | Store everything in folders by village name | ✅ **Complete** |
-| 6️⃣ | (Optional) Add a viewer page to read summaries and see uploads | 🔜 **Coming Soon** |
+| 1️⃣ | Set up Flask API to receive uploads on your PC | **Complete** |
+| 2️⃣ | Use Ngrok to expose your local Flask endpoint | **Next** |
+| 3️⃣ | Build a Streamlit frontend for user uploads + village selection |**Complete** |
+| 4️⃣ | Once uploaded, run AI model (Hugging Face) to summarize content | **Complete** |
+| 5️⃣ | Store everything in folders by village name | **Complete** |
+| 6️⃣ | (Optional) Add a viewer page to read summaries and see uploads | **Coming Soon** |
 
-## 🛠️ Installation & Setup
+##  Installation & Setup
 
 ### Prerequisites
 
@@ -101,7 +101,7 @@ streamlit run streamlit_frontend.py
 - **Flask API**: http://localhost:5000
 - **API Health Check**: http://localhost:5000/health
 
-## 🔧 API Endpoints
+##  API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -120,7 +120,7 @@ curl -X POST http://localhost:5000/upload \
   -F "file=@/path/to/your/file.jpg"
 ```
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 festfusion2.o/
@@ -135,7 +135,7 @@ festfusion2.o/
 └── uploads/                   # File upload directory
 ```
 
-## 🎯 Next Steps
+##  Next Steps
 
 ### Step 2: Ngrok Integration
 To expose your local Flask API to the internet:
@@ -162,7 +162,7 @@ Create a new page to browse and view submitted stories:
 streamlit run viewer_page.py
 ```
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
@@ -188,7 +188,7 @@ Enable debug mode by setting environment variable:
 export FLASK_DEBUG=True
 ```
 
-## 🤝 Contributing
+##  Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -196,11 +196,11 @@ export FLASK_DEBUG=True
 4. Test thoroughly
 5. Submit a pull request
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Hugging Face for AI models
 - Streamlit for the frontend framework
