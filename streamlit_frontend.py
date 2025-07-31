@@ -214,39 +214,26 @@ TELUGU_TRANSLATIONS = {
 # Google Services Connection
 @st.cache_resource
 def get_creds():
-    """Gets the credentials to connect to Google services using OAuth."""
+    """Gets the credentials to connect to Google services using service account."""
     scope = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
     
-    # Try OAuth first (new approach)
+    # Use Streamlit secrets for Streamlit Cloud deployment
     try:
-        oauth_creds = get_oauth_credentials()
-        if oauth_creds:
-            return oauth_creds
-    except Exception as e:
-        st.warning(f"OAuth not available: {e}")
-    
-    # Fallback to service account (old approach)
-    try:
-        creds = Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"],
-            scopes=scope
-        )
-        return creds
-    except Exception as e:
-        # Fallback to local file for development
-        try:
-            # Use absolute path to ensure the file is found regardless of working directory
-            import os
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            credentials_path = os.path.join(current_dir, "festfusion-project-cc628988dd80.json")
-            creds = Credentials.from_service_account_file(credentials_path, scopes=scope)
+        if 'gcp_service_account' in st.secrets:
+            creds = Credentials.from_service_account_info(
+                st.secrets["gcp_service_account"],
+                scopes=scope
+            )
             return creds
-        except Exception as e2:
-            st.error(f"Failed to load Google credentials: {e2}")
+        else:
+            st.warning("Service account not configured in Streamlit secrets")
             return None
+    except Exception as e:
+        st.error(f"Failed to load Google credentials from secrets: {e}")
+        return None
 
 def save_to_sheets(village, original_filename, saved_filename, file_type, english_summary, telugu_summary, story_text="", language="", festival_name="", google_drive_link=""):
     """Save data to Google Sheets using user-edited summaries"""

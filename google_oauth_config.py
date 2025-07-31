@@ -54,9 +54,11 @@ def get_oauth_credentials():
                     redirect_uri=oauth_config['web']['redirect_uris'][0]
                 )
                 
-                # Run the OAuth flow
-                creds = flow.run_local_server(port=0)
-                st.session_state.google_credentials = creds
+                # For Streamlit Cloud, we need to handle OAuth differently
+                # Since we can't open a browser on the server, we'll use a different approach
+                st.error("❌ OAuth flow requires browser interaction which is not available in Streamlit Cloud")
+                st.info("Please use the service account approach for now")
+                return None
                 
                 st.success("✅ Successfully authenticated with Google Drive!")
                 
