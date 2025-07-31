@@ -16,7 +16,7 @@ from google_oauth_config import get_oauth_credentials, upload_file_to_drive
 
 # Page configuration
 st.set_page_config(
-    page_title="FestFusion Telangana",
+    page_title="FestFusion Telangana - Updated",
     page_icon="",
     layout="wide"
 )
@@ -214,13 +214,23 @@ TELUGU_TRANSLATIONS = {
 # Google Services Connection
 @st.cache_resource
 def get_creds():
-    """Gets the credentials to connect to Google services using service account."""
+    """Gets the credentials to connect to Google services using local JSON files."""
     scope = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
     
-    # Use Streamlit secrets for Streamlit Cloud deployment
+    # Try to use local JSON files first (for development)
+    try:
+        # Check for service account JSON file
+        service_account_path = "festfusion-project-cc628988dd80.json"
+        if os.path.exists(service_account_path):
+            creds = Credentials.from_service_account_file(service_account_path, scopes=scope)
+            return creds
+    except Exception as e:
+        st.warning(f"Local service account file not found: {e}")
+    
+    # Fallback to Streamlit secrets (for cloud deployment)
     try:
         if 'gcp_service_account' in st.secrets:
             creds = Credentials.from_service_account_info(
@@ -232,7 +242,7 @@ def get_creds():
             st.warning("Service account not configured in Streamlit secrets")
             return None
     except Exception as e:
-        st.error(f"Failed to load Google credentials from secrets: {e}")
+        st.error(f"Failed to load Google credentials: {e}")
         return None
 
 def save_to_sheets(village, original_filename, saved_filename, file_type, english_summary, telugu_summary, story_text="", language="", festival_name="", google_drive_link=""):
