@@ -8,7 +8,9 @@ from pathlib import Path
 import requests
 import json
 import pandas as pd
-from google_oauth_config import get_oauth_credentials, upload_file_to_drive
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+import io
 # transformers import removed - using template-based summaries instead
 
 # Configuration
@@ -348,7 +350,7 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
         return False
 
 def upload_file(village, file):
-    """Handles file upload - saves locally when possible, uses session storage for cloud."""
+    """Handles file upload - saves locally and uploads to Google Drive."""
     try:
         # Prepare file metadata
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -359,6 +361,7 @@ def upload_file(village, file):
         file_path = ""
         storage_type = "session"
         storage_message = "File uploaded successfully"
+        google_drive_link = ""
         
         try:
             # Create uploads directory if it doesn't exist
@@ -393,6 +396,56 @@ def upload_file(village, file):
             storage_type = "session"
             storage_message = f"File stored in session (temporary): {filename}"
         
+        # Try to upload to Google Drive
+        try:
+            creds = get_creds()
+            if creds:
+                # Build Drive service
+                drive_service = build('drive', 'v3', credentials=creds)
+                
+                # Create folder structure in Drive
+                folder_name = f"FestFusion_Uploads/{village}"
+                
+                # Check if folder exists, create if not
+                folder_query = f"name='{folder_name}' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+                folder_results = drive_service.files().list(q=folder_query).execute()
+                
+                if folder_results['files']:
+                    folder_id = folder_results['files'][0]['id']
+                else:
+                    # Create folder
+                    folder_metadata = {
+                        'name': folder_name,
+                        'mimeType': 'application/vnd.google-apps.folder'
+                    }
+                    folder = drive_service.files().create(body=folder_metadata, fields='id').execute()
+                    folder_id = folder['id']
+                
+                # Upload file to Drive
+                file_metadata = {
+                    'name': filename,
+                    'parents': [folder_id]
+                }
+                
+                media = MediaIoBaseUpload(
+                    io.BytesIO(file_bytes),
+                    mimetype=file.type,
+                    resumable=True
+                )
+                
+                file_drive = drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id,webViewLink'
+                ).execute()
+                
+                google_drive_link = file_drive.get('webViewLink', '')
+                storage_message += f" | Uploaded to Google Drive: {google_drive_link}"
+                
+        except Exception as drive_error:
+            # Google Drive upload failed, but local upload succeeded
+            storage_message += f" | Google Drive upload failed: {str(drive_error)}"
+        
         return {
             "success": True,
             "saved_filename": filename,
@@ -401,7 +454,7 @@ def upload_file(village, file):
             "file_type": file.type,
             "village": village,
             "file_path": str(file_path) if file_path else "",
-            "google_drive_link": storage_message,
+            "google_drive_link": google_drive_link,
             "storage_type": storage_type
         }
         
