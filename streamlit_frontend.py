@@ -342,73 +342,50 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
         return False
 
 def upload_file(village, file):
-    """Handles file upload - always saves locally, optionally uploads to Google Drive."""
+    """Handles file upload - saves locally when possible, uses session storage for cloud."""
     try:
         # Prepare file metadata
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{file.name}"
-        
-        # Create uploads directory if it doesn't exist
-        upload_dir = Path("uploads")
-        upload_dir.mkdir(exist_ok=True)
-        
-        # Create village-specific subdirectory
-        village_dir = upload_dir / village
-        village_dir.mkdir(exist_ok=True)
-        
-        # Save file locally first
         file_bytes = file.getvalue()
-        file_path = village_dir / filename
-        with open(file_path, "wb") as f:
-            f.write(file_bytes)
         
-        # Try to upload to Google Drive as backup (optional)
-        google_drive_link = ""
-        storage_type = "local"
+        # Try local storage first (works on local machine)
+        file_path = ""
+        storage_type = "session"
+        storage_message = "File uploaded successfully"
         
         try:
-            # Get Google Drive credentials
-            creds = get_creds()
-            if creds is not None:
-                # Import Google Drive API
-                from googleapiclient.discovery import build
-                from googleapiclient.http import MediaIoBaseUpload
-                import io
-                
-                # Create Drive service
-                drive_service = build('drive', 'v3', credentials=creds)
-                
-                # Google Drive folder ID for FestFusion uploads
-                FOLDER_ID = "1DBeE3IW9h3i4m67OXS7nZ2iVO0zXXk0Q"  # FestFusion Uploads folder
-                
-                # Create file metadata
-                file_metadata = {
-                    'name': filename,
-                    'parents': [FOLDER_ID]
-                }
-                
-                # Create media upload
-                media = MediaIoBaseUpload(
-                    io.BytesIO(file_bytes),
-                    mimetype=file.type,
-                    resumable=True
-                )
-                
-                # Upload to Google Drive
-                file_response = drive_service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id,name,webViewLink'
-                ).execute()
-                
-                # Get the file link
-                google_drive_link = file_response.get('webViewLink', '')
-                storage_type = "local_and_drive"
-                
-        except Exception as drive_error:
-            # Google Drive upload failed, but local save was successful
-            google_drive_link = f"File saved locally: {file_path}"
+            # Create uploads directory if it doesn't exist
+            upload_dir = Path("uploads")
+            upload_dir.mkdir(exist_ok=True)
+            
+            # Create village-specific subdirectory
+            village_dir = upload_dir / village
+            village_dir.mkdir(exist_ok=True)
+            
+            # Save file locally
+            file_path = village_dir / filename
+            with open(file_path, "wb") as f:
+                f.write(file_bytes)
+            
             storage_type = "local"
+            storage_message = f"File saved locally: {file_path}"
+            
+        except Exception as local_error:
+            # Local storage failed (probably on Streamlit Cloud)
+            # Store file in session state for temporary access
+            if 'uploaded_files' not in st.session_state:
+                st.session_state.uploaded_files = {}
+            
+            st.session_state.uploaded_files[filename] = {
+                'bytes': file_bytes,
+                'type': file.type,
+                'village': village,
+                'timestamp': timestamp
+            }
+            
+            storage_type = "session"
+            storage_message = f"File stored in session (temporary): {filename}"
         
         return {
             "success": True,
@@ -417,8 +394,8 @@ def upload_file(village, file):
             "file_size": len(file_bytes),
             "file_type": file.type,
             "village": village,
-            "file_path": str(file_path),
-            "google_drive_link": google_drive_link,
+            "file_path": str(file_path) if file_path else "",
+            "google_drive_link": storage_message,
             "storage_type": storage_type
         }
         
@@ -725,7 +702,7 @@ def main():
                     story_text=upload_data.get('story_text', story_text),
                     language=upload_data.get('language', summary_language),
                     festival_name=upload_data.get('festival_name', festival_name),
-                    google_drive_link=upload_data.get('google_drive_link', '')
+                    google_drive_link=upload_data.get('storage_type', 'unknown')
                 )
             
             if sheets_success:
@@ -763,16 +740,13 @@ def main():
             
             # Show file location based on storage type
             storage_type = upload_data.get('storage_type', 'unknown')
-            if storage_type == 'google_drive' and upload_data.get('google_drive_link'):
-                st.write(f"**File Location:** [View in Google Drive]({upload_data['google_drive_link']})")
-            elif storage_type == 'local':
+            if storage_type == 'local':
                 file_path = upload_data.get('file_path', 'Saved locally')
                 st.write(f"**File Location:** {file_path}")
-            elif storage_type == 'local_and_drive':
-                file_path = upload_data.get('file_path', 'Saved locally')
-                st.write(f"**File Location:** {file_path}")
-                if upload_data.get('google_drive_link'):
-                    st.write(f"**Google Drive:** [View in Drive]({upload_data['google_drive_link']})")
+                st.success("✅ File saved to your PC")
+            elif storage_type == 'session':
+                st.write(f"**File Location:** {upload_data.get('google_drive_link', 'File uploaded successfully')}")
+                st.info("ℹ️ File stored temporarily in session (Streamlit Cloud)")
             else:
                 st.write("**File Location:** File uploaded successfully")
             
@@ -845,7 +819,7 @@ def main():
                     story_text=upload_data.get('story_text', ''),
                     language=upload_data.get('language', ''),
                     festival_name=upload_data.get('festival_name', ''),
-                    google_drive_link=upload_data.get('google_drive_link', '')
+                    google_drive_link=upload_data.get('storage_type', 'unknown')
                 )
             
             if sheets_success:
