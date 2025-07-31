@@ -8,6 +8,7 @@ from pathlib import Path
 import requests
 import json
 import pandas as pd
+from google_oauth_config import get_oauth_credentials, upload_file_to_drive
 # transformers import removed - using template-based summaries instead
 
 # Configuration
@@ -213,13 +214,21 @@ TELUGU_TRANSLATIONS = {
 # Google Services Connection
 @st.cache_resource
 def get_creds():
-    """Gets the credentials to connect to Google services using Streamlit secrets."""
+    """Gets the credentials to connect to Google services using OAuth."""
     scope = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
     
-    # Use Streamlit secrets for Streamlit Cloud deployment
+    # Try OAuth first (new approach)
+    try:
+        oauth_creds = get_oauth_credentials()
+        if oauth_creds:
+            return oauth_creds
+    except Exception as e:
+        st.warning(f"OAuth not available: {e}")
+    
+    # Fallback to service account (old approach)
     try:
         creds = Credentials.from_service_account_info(
             st.secrets["gcp_service_account"],

@@ -14,8 +14,11 @@ import json
 import pickle
 from pathlib import Path
 
-# OAuth 2.0 scopes for Google Drive
-SCOPES = ['https://www.googleapis.com/auth/drive.file']
+# OAuth 2.0 scopes for Google Drive and Sheets
+SCOPES = [
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/spreadsheets'
+]
 
 def get_oauth_credentials():
     """
