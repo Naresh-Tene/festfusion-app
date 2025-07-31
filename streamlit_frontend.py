@@ -342,7 +342,7 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
         return False
 
 def upload_file(village, file):
-    """Handles file upload to Google Drive for permanent storage."""
+    """Handles file upload with fallback to local storage if Google Drive fails."""
     try:
         # Get Google Drive credentials
         creds = get_creds()
@@ -378,27 +378,53 @@ def upload_file(village, file):
             resumable=True
         )
         
-        # Upload file to Google Drive
-        file_response = drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id,name,webViewLink'
-        ).execute()
-        
-        # Get the file link
-        file_link = file_response.get('webViewLink', '')
-        file_id = file_response.get('id', '')
-        
-        return {
-            "success": True,
-            "saved_filename": filename,
-            "original_filename": file.name,
-            "file_size": len(file_bytes),
-            "file_type": file.type,
-            "village": village,
-            "google_drive_id": file_id,
-            "google_drive_link": file_link
-        }
+        # Try to upload file to Google Drive
+        try:
+            file_response = drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id,name,webViewLink'
+            ).execute()
+            
+            # Get the file link
+            file_link = file_response.get('webViewLink', '')
+            file_id = file_response.get('id', '')
+            
+            return {
+                "success": True,
+                "saved_filename": filename,
+                "original_filename": file.name,
+                "file_size": len(file_bytes),
+                "file_type": file.type,
+                "village": village,
+                "google_drive_id": file_id,
+                "google_drive_link": file_link,
+                "storage_type": "google_drive"
+            }
+            
+        except Exception as drive_error:
+            # If Google Drive fails (e.g., storage quota exceeded), fallback to local storage
+            st.warning("Google Drive storage quota exceeded. Saving file locally instead.")
+            
+            # Create uploads directory if it doesn't exist
+            upload_dir = Path("uploads")
+            upload_dir.mkdir(exist_ok=True)
+            
+            # Save file locally
+            file_path = upload_dir / filename
+            with open(file_path, "wb") as f:
+                f.write(file_bytes)
+            
+            return {
+                "success": True,
+                "saved_filename": filename,
+                "original_filename": file.name,
+                "file_size": len(file_bytes),
+                "file_type": file.type,
+                "village": village,
+                "google_drive_link": f"File saved locally: {file_path}",
+                "storage_type": "local"
+            }
         
     except Exception as e:
         st.error(f"Upload error: {str(e)}")
@@ -739,11 +765,14 @@ def main():
             st.write(f"**District:** {upload_data.get('village', 'N/A')}")
             st.write(f"**Festival:** {upload_data.get('festival_name', 'N/A')}")
             
-            # Show Google Drive link if available
-            if upload_data.get('google_drive_link'):
+            # Show file location based on storage type
+            storage_type = upload_data.get('storage_type', 'unknown')
+            if storage_type == 'google_drive' and upload_data.get('google_drive_link'):
                 st.write(f"**File Location:** [View in Google Drive]({upload_data['google_drive_link']})")
+            elif storage_type == 'local':
+                st.write(f"**File Location:** {upload_data.get('google_drive_link', 'Saved locally')}")
             else:
-                st.write("**File Location:** Uploaded to Google Drive")
+                st.write("**File Location:** File uploaded successfully")
             
             if upload_data.get('story_text'):
                 st.markdown("### Story Text")
