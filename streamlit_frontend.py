@@ -239,7 +239,7 @@ def get_creds():
             st.error(f"Failed to load Google credentials: {e2}")
             return None
 
-def save_to_sheets(village, original_filename, saved_filename, file_type, english_summary, telugu_summary, story_text="", language="", festival_name=""):
+def save_to_sheets(village, original_filename, saved_filename, file_type, english_summary, telugu_summary, story_text="", language="", festival_name="", google_drive_link=""):
     """Save data to Google Sheets using user-edited summaries"""
     try:
         print(f"Debug - Starting save_to_sheets function")
@@ -271,7 +271,7 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
             ]
             
             # Only fix headers if they're wrong
-            if not current_headers or len(current_headers) < 6 or current_headers != correct_headers:
+            if not current_headers or len(current_headers) < 7 or current_headers != correct_headers:
                 print(f"Debug - Fixing headers")
                 # Delete only the first row and insert correct headers
                 worksheet.delete_rows(1)
@@ -290,7 +290,8 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
                 "district_name",
                 "story[english summary]",
                 "festival_name",
-                "telugu summary"
+                "telugu summary",
+                "google_drive_link"
             ]
             worksheet.append_row(correct_headers)
             print(f"Debug - Sheet reset with headers: {correct_headers}")
@@ -302,7 +303,8 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
             village,
             english_summary,
             festival_name,
-            telugu_summary
+            telugu_summary,
+            google_drive_link
         ]
         
         # Debug: Print the data being saved
@@ -340,29 +342,66 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
         return False
 
 def upload_file(village, file):
-    """Handles file upload locally for Streamlit Cloud deployment."""
+    """Handles file upload to Google Drive for permanent storage."""
     try:
-        # Create uploads directory if it doesn't exist
-        upload_dir = Path("uploads")
-        upload_dir.mkdir(exist_ok=True)
+        # Get Google Drive credentials
+        creds = get_creds()
+        if creds is None:
+            return {"error": "Google credentials not available"}
         
-        # Save file locally
+        # Import Google Drive API
+        from googleapiclient.discovery import build
+        from googleapiclient.http import MediaIoBaseUpload
+        import io
+        
+        # Create Drive service
+        drive_service = build('drive', 'v3', credentials=creds)
+        
+        # Google Drive folder ID for FestFusion uploads
+        FOLDER_ID = "1DBeE3IW9h3i4m67OXS7nZ2iVO0zXXk0Q"  # FestFusion Uploads folder
+        
+        # Prepare file metadata
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{file.name}"
-        file_path = upload_dir / filename
         
-        with open(file_path, "wb") as f:
-            f.write(file.getvalue())
+        # Create file metadata
+        file_metadata = {
+            'name': filename,
+            'parents': [FOLDER_ID]
+        }
+        
+        # Create media upload
+        file_bytes = file.getvalue()
+        media = MediaIoBaseUpload(
+            io.BytesIO(file_bytes),
+            mimetype=file.type,
+            resumable=True
+        )
+        
+        # Upload file to Google Drive
+        file_response = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id,name,webViewLink'
+        ).execute()
+        
+        # Get the file link
+        file_link = file_response.get('webViewLink', '')
+        file_id = file_response.get('id', '')
         
         return {
             "success": True,
             "saved_filename": filename,
             "original_filename": file.name,
-            "file_size": len(file.getvalue()),
+            "file_size": len(file_bytes),
             "file_type": file.type,
-            "village": village
+            "village": village,
+            "google_drive_id": file_id,
+            "google_drive_link": file_link
         }
+        
     except Exception as e:
+        st.error(f"Upload error: {str(e)}")
         return {"error": f"Upload error: {str(e)}"}
 
 def translate_english_to_telugu(english_text):
@@ -663,7 +702,8 @@ def main():
                     telugu_summary=edited_telugu,
                     story_text=upload_data.get('story_text', story_text),
                     language=upload_data.get('language', summary_language),
-                    festival_name=upload_data.get('festival_name', festival_name)
+                    festival_name=upload_data.get('festival_name', festival_name),
+                    google_drive_link=upload_data.get('google_drive_link', '')
                 )
             
             if sheets_success:
@@ -698,6 +738,12 @@ def main():
             st.write(f"**File Size:** {upload_data['file_size']} bytes")
             st.write(f"**District:** {upload_data.get('village', 'N/A')}")
             st.write(f"**Festival:** {upload_data.get('festival_name', 'N/A')}")
+            
+            # Show Google Drive link if available
+            if upload_data.get('google_drive_link'):
+                st.write(f"**File Location:** [View in Google Drive]({upload_data['google_drive_link']})")
+            else:
+                st.write("**File Location:** Uploaded to Google Drive")
             
             if upload_data.get('story_text'):
                 st.markdown("### Story Text")
@@ -767,7 +813,8 @@ def main():
                     telugu_summary=edited_telugu,
                     story_text=upload_data.get('story_text', ''),
                     language=upload_data.get('language', ''),
-                    festival_name=upload_data.get('festival_name', '')
+                    festival_name=upload_data.get('festival_name', ''),
+                    google_drive_link=upload_data.get('google_drive_link', '')
                 )
             
             if sheets_success:
