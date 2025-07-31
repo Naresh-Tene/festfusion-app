@@ -342,89 +342,85 @@ def save_to_sheets(village, original_filename, saved_filename, file_type, englis
         return False
 
 def upload_file(village, file):
-    """Handles file upload with fallback to local storage if Google Drive fails."""
+    """Handles file upload - always saves locally, optionally uploads to Google Drive."""
     try:
-        # Get Google Drive credentials
-        creds = get_creds()
-        if creds is None:
-            return {"error": "Google credentials not available"}
-        
-        # Import Google Drive API
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaIoBaseUpload
-        import io
-        
-        # Create Drive service
-        drive_service = build('drive', 'v3', credentials=creds)
-        
-        # Google Drive folder ID for FestFusion uploads
-        FOLDER_ID = "1DBeE3IW9h3i4m67OXS7nZ2iVO0zXXk0Q"  # FestFusion Uploads folder
-        
         # Prepare file metadata
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{file.name}"
         
-        # Create file metadata
-        file_metadata = {
-            'name': filename,
-            'parents': [FOLDER_ID]
-        }
+        # Create uploads directory if it doesn't exist
+        upload_dir = Path("uploads")
+        upload_dir.mkdir(exist_ok=True)
         
-        # Create media upload
+        # Create village-specific subdirectory
+        village_dir = upload_dir / village
+        village_dir.mkdir(exist_ok=True)
+        
+        # Save file locally first
         file_bytes = file.getvalue()
-        media = MediaIoBaseUpload(
-            io.BytesIO(file_bytes),
-            mimetype=file.type,
-            resumable=True
-        )
+        file_path = village_dir / filename
+        with open(file_path, "wb") as f:
+            f.write(file_bytes)
         
-        # Try to upload file to Google Drive
+        # Try to upload to Google Drive as backup (optional)
+        google_drive_link = ""
+        storage_type = "local"
+        
         try:
-            file_response = drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id,name,webViewLink'
-            ).execute()
-            
-            # Get the file link
-            file_link = file_response.get('webViewLink', '')
-            file_id = file_response.get('id', '')
-            
-            return {
-                "success": True,
-                "saved_filename": filename,
-                "original_filename": file.name,
-                "file_size": len(file_bytes),
-                "file_type": file.type,
-                "village": village,
-                "google_drive_id": file_id,
-                "google_drive_link": file_link,
-                "storage_type": "google_drive"
-            }
-            
+            # Get Google Drive credentials
+            creds = get_creds()
+            if creds is not None:
+                # Import Google Drive API
+                from googleapiclient.discovery import build
+                from googleapiclient.http import MediaIoBaseUpload
+                import io
+                
+                # Create Drive service
+                drive_service = build('drive', 'v3', credentials=creds)
+                
+                # Google Drive folder ID for FestFusion uploads
+                FOLDER_ID = "1DBeE3IW9h3i4m67OXS7nZ2iVO0zXXk0Q"  # FestFusion Uploads folder
+                
+                # Create file metadata
+                file_metadata = {
+                    'name': filename,
+                    'parents': [FOLDER_ID]
+                }
+                
+                # Create media upload
+                media = MediaIoBaseUpload(
+                    io.BytesIO(file_bytes),
+                    mimetype=file.type,
+                    resumable=True
+                )
+                
+                # Upload to Google Drive
+                file_response = drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id,name,webViewLink'
+                ).execute()
+                
+                # Get the file link
+                google_drive_link = file_response.get('webViewLink', '')
+                storage_type = "local_and_drive"
+                
         except Exception as drive_error:
-            # If Google Drive fails (e.g., storage quota exceeded), fallback to local storage
-            st.warning("Google Drive storage quota exceeded. Saving file locally instead.")
-            
-            # Create uploads directory if it doesn't exist
-            upload_dir = Path("uploads")
-            upload_dir.mkdir(exist_ok=True)
-            
-            # Save file locally
-            file_path = upload_dir / filename
-            with open(file_path, "wb") as f:
-                f.write(file_bytes)
-            
-            return {
-                "success": True,
-                "saved_filename": filename,
-                "original_filename": file.name,
-                "file_size": len(file_bytes),
-                "file_type": file.type,
-                "village": village,
-                "google_drive_link": f"File saved locally: {file_path}",
-                "storage_type": "local"
-            }
+            # Google Drive upload failed, but local save was successful
+            google_drive_link = f"File saved locally: {file_path}"
+            storage_type = "local"
+        
+        return {
+            "success": True,
+            "saved_filename": filename,
+            "original_filename": file.name,
+            "file_size": len(file_bytes),
+            "file_type": file.type,
+            "village": village,
+            "file_path": str(file_path),
+            "google_drive_link": google_drive_link,
+            "storage_type": storage_type
+        }
         
     except Exception as e:
         st.error(f"Upload error: {str(e)}")
@@ -770,7 +766,13 @@ def main():
             if storage_type == 'google_drive' and upload_data.get('google_drive_link'):
                 st.write(f"**File Location:** [View in Google Drive]({upload_data['google_drive_link']})")
             elif storage_type == 'local':
-                st.write(f"**File Location:** {upload_data.get('google_drive_link', 'Saved locally')}")
+                file_path = upload_data.get('file_path', 'Saved locally')
+                st.write(f"**File Location:** {file_path}")
+            elif storage_type == 'local_and_drive':
+                file_path = upload_data.get('file_path', 'Saved locally')
+                st.write(f"**File Location:** {file_path}")
+                if upload_data.get('google_drive_link'):
+                    st.write(f"**Google Drive:** [View in Drive]({upload_data['google_drive_link']})")
             else:
                 st.write("**File Location:** File uploaded successfully")
             
