@@ -70,7 +70,7 @@ def get_villages():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    """Handle file upload - just save file locally and return info"""
+    """Handle file upload - save file locally and return info"""
     try:
         # Check if village is provided
         village = request.form.get('village')
@@ -94,6 +94,14 @@ def upload_file():
         
         if not result["success"]:
             return jsonify({"error": result["error"]}), 500
+        
+        # Get the ngrok URL if available
+        ngrok_url = None
+        try:
+            with open('ngrok_url.txt', 'r') as f:
+                ngrok_url = f.read().strip()
+        except FileNotFoundError:
+            pass
         
         return jsonify({
             "success": True,
